@@ -5,14 +5,11 @@ import {
   Calendar,
   Wallet,
   Sparkles,
-  ShieldCheck,
   ChevronRight,
   Sun,
   Droplets,
-  DollarSign,
   MessageSquare,
   Users,
-  CheckCircle,
 } from 'lucide-react';
 
 export default function SaaSPlatformHomePage() {

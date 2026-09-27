@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  Calendar,
   Clock,
   MapPin,
   Phone,

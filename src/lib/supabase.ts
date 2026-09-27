@@ -35,12 +35,12 @@ export const supabase = isSupabaseConfigured
 // ============================================================================
 // IN-MEMORY STORE (Fallback for smooth local development & live demoing)
 // ============================================================================
-let localTenants: Tenant[] = [mockTenant];
-let localStaff: Staff[] = [...mockStaff];
-let localServices: Service[] = [...mockServices];
-let localClients: Client[] = [...mockClients];
-let localAppointments: Appointment[] = [...mockAppointments];
-let localTransactions: Transaction[] = [];
+const localTenants: Tenant[] = [mockTenant];
+const localStaff: Staff[] = [...mockStaff];
+const localServices: Service[] = [...mockServices];
+const localClients: Client[] = [...mockClients];
+const localAppointments: Appointment[] = [...mockAppointments];
+const localTransactions: Transaction[] = [];
 
 // ============================================================================
 // DATA ACCESS LAYER: Multi-Tenant Queries

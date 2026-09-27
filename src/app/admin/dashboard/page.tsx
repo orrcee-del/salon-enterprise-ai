@@ -5,18 +5,11 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Scissors,
-  Users,
   Calendar,
   Clock,
-  DollarSign,
   Sun,
   Droplets,
   CreditCard,
-  CheckCircle,
-  AlertCircle,
-  XCircle,
-  ArrowRight,
-  RefreshCw,
   TrendingUp,
 } from 'lucide-react';
 import { Tenant, Staff, Appointment, AppointmentStatus } from '@/types/database';

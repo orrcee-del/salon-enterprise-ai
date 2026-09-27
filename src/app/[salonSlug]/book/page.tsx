@@ -100,6 +100,7 @@ export default function BookingWizardPage() {
       }
     }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
@@ -118,7 +119,8 @@ export default function BookingWizardPage() {
     try {
       // Build ISO Start Time from selectedDate and selectedTime
       const [time, modifier] = selectedTime.split(' ');
-      let [hours, minutes] = time.split(':').map(Number);
+      const [rawHours, minutes] = time.split(':').map(Number);
+      let hours = rawHours;
       if (modifier === 'PM' && hours < 12) hours += 12;
       if (modifier === 'AM' && hours === 12) hours = 0;
 

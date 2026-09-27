@@ -5,27 +5,21 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
-  Scissors,
   CreditCard,
   Wallet,
   DollarSign,
   ArrowLeft,
   CheckCircle2,
   User,
-  Phone,
-  Receipt,
-  Sparkles,
   Smartphone,
   Banknote,
 } from 'lucide-react';
-import { Staff, Client, PaymentMethod, Transaction } from '@/types/database';
+import { Staff, PaymentMethod, Transaction } from '@/types/database';
 import {
   getTenantBySlug,
   getTenantStaff,
   processPOSCheckout,
-  getTenantServices,
 } from '@/lib/supabase';
-import { mockClients } from '@/lib/mockData';
 
 export default function POSCheckoutPage() {
   const router = useRouter();
