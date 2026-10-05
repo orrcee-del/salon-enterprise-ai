@@ -1,7 +1,7 @@
 // src/app/admin/pos/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -21,7 +21,7 @@ import {
   processPOSCheckout,
 } from '@/lib/supabase';
 
-export default function POSCheckoutPage() {
+function POSCheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -442,5 +442,19 @@ export default function POSCheckoutPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function POSCheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <POSCheckoutContent />
+    </Suspense>
   );
 }

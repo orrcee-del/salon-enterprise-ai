@@ -1,7 +1,8 @@
 // src/app/[salonSlug]/book/page.tsx
 'use client';
-
-import React, { useEffect, useState } from 'react';
+import confetti from 'canvas-confetti';
+import { QRCodeSVG } from 'qrcode.react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import {
@@ -42,7 +43,7 @@ const TIME_SLOTS = [
   '05:30 PM',
 ];
 
-export default function BookingWizardPage() {
+function BookingWizardContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const slug = (params?.salonSlug as string) || 'legends-barbershop-avondale';
@@ -136,7 +137,13 @@ export default function BookingWizardPage() {
         startTime: dateObj.toISOString(),
         notes,
       });
-
+      // Trigger celebratory confetti burst!
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#f59e0b', '#10b981', '#3b82f6', '#ffffff'],
+      });
       setConfirmedAppointment(appt);
       setStep(5); // Show Ticket
     } catch (err) {
@@ -249,7 +256,27 @@ export default function BookingWizardPage() {
                   </p>
                 </div>
               </div>
-
+              {/* Scannable Mirror QR Code */}
+              <div className="my-5 p-4 rounded-2xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-amber-400">
+                    Mirror Check-In Code
+                  </span>
+                  <p className="text-xs text-neutral-300">
+                    Scan this code at the salon mirror scanner on arrival.
+                  </p>
+                  <p className="font-mono text-[10px] text-neutral-500">
+                    TICKET:#{confirmedAppointment.id.slice(-6).toUpperCase()}
+                  </p>
+                </div>
+                <div className="p-2.5 bg-white rounded-xl flex-shrink-0 shadow-md">
+                  <QRCodeSVG
+                    value={`https://trimflow.app/ticket/${confirmedAppointment.id}`}
+                    size={72}
+                    level="M"
+                  />
+                </div>
+              </div>
               {/* WhatsApp & Wallet Callout */}
               <div className="mt-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
                 <MessageSquare className="w-5 h-5 text-amber-400 flex-shrink-0" />
@@ -596,5 +623,19 @@ export default function BookingWizardPage() {
         </p>
       </footer>
     </div>
+  );
+}
+
+export default function BookingWizardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <BookingWizardContent />
+    </Suspense>
   );
 }

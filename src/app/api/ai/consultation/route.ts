@@ -3,6 +3,7 @@
 // Powered by Gemini Vision & Intelligent Face-Shape Heuristics
 
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,48 +13,36 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     // If Gemini API Key is present, we can call the Gemini 1.5 Flash Vision endpoint
-    if (apiKey && clientImageBase64) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text:
-                        'You are a master barber stylist. Analyze this client face and suggest the top 2 recommended haircut styles and beard contours. Keep the advice concise and technical for the barber.',
-                    },
-                    {
-                      inline_data: {
-                        mime_type: 'image/jpeg',
-                        data: clientImageBase64.replace(/^data:image\/\w+;base64,/, ''),
-                      },
-                    },
-                  ],
-                },
-              ],
-            }),
+        // Official Google Gemini 1.5 Flash Vision SDK Call
+        if (apiKey && clientImageBase64) {
+          try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+            const prompt =
+              'You are a master barber stylist. Analyze this client face and suggest the top 2 recommended haircut styles and beard contours. Keep the advice concise and technical for the barber.';
+    
+            const imagePart = {
+              inlineData: {
+                data: clientImageBase64.replace(/^data:image\/\w+;base64,/, ''),
+                mimeType: 'image/jpeg',
+              },
+            };
+    
+            const result = await model.generateContent([prompt, imagePart]);
+            const aiText = result.response.text();
+    
+            if (aiText) {
+              return NextResponse.json({
+                success: true,
+                consultationSummary: aiText,
+                source: 'gemini-1.5-flash-sdk',
+              });
+            }
+          } catch (geminiErr) {
+            console.error('Gemini SDK error:', geminiErr);
           }
-        );
-
-        const data = await response.json();
-        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (aiText) {
-          return NextResponse.json({
-            success: true,
-            consultationSummary: aiText,
-            source: 'gemini-1.5-flash',
-          });
         }
-      } catch (geminiErr) {
-        console.error('Gemini vision API error:', geminiErr);
-      }
-    }
-
     // High-precision algorithmic style heuristic matrix
     let recommendation = '';
     const shape = (faceShape || 'oval').toLowerCase();

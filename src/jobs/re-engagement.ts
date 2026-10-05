@@ -3,6 +3,7 @@
 // Scans client haircut cycles (e.g., 14 days) and triggers WhatsApp re-booking invites
 
 import { mockClients, mockTenant, mockStaff } from '@/lib/mockData';
+import { differenceInDays } from 'date-fns';
 
 export interface RetentionPing {
   clientId: string;
@@ -23,8 +24,7 @@ export async function runRetentionCycleCheck(): Promise<RetentionPing[]> {
   for (const client of mockClients) {
     if (!client.last_visit_at) continue;
 
-    const lastVisit = new Date(client.last_visit_at).getTime();
-    const daysSince = Math.floor((now - lastVisit) / (1000 * 60 * 60 * 24));
+    const daysSince = differenceInDays(new Date(), new Date(client.last_visit_at));
 
     if (daysSince >= CYCLE_THRESHOLD_DAYS) {
       const barber = mockStaff[0];
