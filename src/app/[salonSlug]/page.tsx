@@ -130,6 +130,13 @@ export default function SalonStorefrontPage() {
             {/* Direct Booking CTA */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <Link
+                href={`/${tenant.slug}/ai-studio`}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-400 font-bold text-sm border border-amber-500/40 shadow-lg shadow-black/40 transition-all hover:scale-[1.02]"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                AI Virtual Try-On (Nails & Hair)
+              </Link>
+              <Link
                 href={`/${tenant.slug}/book`}
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-base shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >

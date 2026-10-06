@@ -3,27 +3,28 @@
 
 export type CurrencyPreference = 'USD' | 'ZWG' | 'MULTI';
 
-export type StaffRole = 'owner' | 'manager' | 'barber' | 'stylist';
-
-export type CompensationType = 'booth_rent' | 'commission' | 'salary';
-
-export type AppointmentStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'in_chair'
-  | 'completed'
-  | 'cancelled'
-  | 'no_show';
-
-export type PaymentMethod =
-  | 'cash_usd'
-  | 'innbucks'
-  | 'ecocash_usd'
-  | 'card'
-  | 'store_credit';
-
-export type ServiceCategory = 'Haircut' | 'Beard' | 'Treatment' | 'Combo' | 'Styling';
-
+export type StaffRole = 
+  | 'owner' 
+  | 'manager' 
+  | 'barber' 
+  | 'stylist' 
+  | 'braider' 
+  | 'nail_tech' 
+  | 'lash_tech'
+  | 'makeup_artist' 
+  | 'massage_therapist' 
+  | 'esthetician';
+  export type ServiceCategory = 
+  | 'Haircut' 
+  | 'Beard' 
+  | 'Braids & Weaves' 
+  | 'Nails & Pedicure' 
+  | 'Lashes & Brows'
+  | 'Makeup & Glam' 
+  | 'Spa & Massage' 
+  | 'Skincare & Facials' 
+  | 'Treatment' 
+  | 'Combo';
 /**
  * 1. Tenant (Salon or Barbershop Organization)
  */
@@ -109,6 +110,18 @@ export interface Appointment {
   deposit_amount: number;
   notes?: string;
   ai_consultation_summary?: string;
+  ai_tryon_data?: {
+    category: 'hair' | 'nails' | 'lashes_brows';
+    style_name: string;
+    details?: {
+      color?: string;
+      nail_shape?: 'Almond' | 'Coffin' | 'Stiletto' | 'Square';
+      max_recommended_length_mm?: number; // e.g. 13mm based on eye-to-brow spacing
+      lash_map_style?: 'Cat-Eye' | 'Doll-Eye' | 'Wispy-Hybrid' | 'Classic-Natural';
+      brow_shape?: string; // e.g. "Soft Ombre Arch"
+    };
+  };
+    
   created_at: string;
 
   // Joined relations for convenience
@@ -132,4 +145,17 @@ export interface Transaction {
   staff_cut: number; // Barber/Stylist earnings
   change_credited_to_wallet: number; // Amount redirected to store credit change
   created_at: string;
+}
+/**
+ * 7. Salon Retail & Hairpieces in Stock (Darling, Expressions, Ointments)
+ */
+export interface InventoryItem {
+  id: string;
+  tenant_id: string;
+  category: 'Braids' | 'Weaves' | 'Product' | 'Accessory';
+  name: string; // e.g. "Darling Abuja Braid #1B" or "Expressions French Curl"
+  brand: string;
+  price_usd: number;
+  stock_quantity: number;
+  is_active: boolean;
 }
