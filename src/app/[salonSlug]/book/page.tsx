@@ -50,6 +50,8 @@ function BookingWizardContent() {
 
   const initialServiceId = searchParams.get('serviceId') || '';
   const initialBarberId = searchParams.get('barberId') || '';
+  const tryonStyle = searchParams.get('style') || '';
+  const tryonShade = searchParams.get('shade') || '';
 
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -68,7 +70,9 @@ function BookingWizardContent() {
   const [selectedTime, setSelectedTime] = useState<string>('10:30 AM');
   const [clientName, setClientName] = useState<string>('');
   const [clientPhone, setClientPhone] = useState<string>('+263');
-  const [notes, setNotes] = useState<string>('');
+  const [notes, setNotes] = useState<string>(
+    tryonStyle ? `AI Studio Selection: ${tryonStyle} [${tryonShade}]` : ''
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedAppointment, setConfirmedAppointment] = useState<Appointment | null>(null);

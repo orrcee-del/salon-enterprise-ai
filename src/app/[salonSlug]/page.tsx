@@ -1,360 +1,390 @@
-// src/app/[salonSlug]/page.tsx
+// src/app/[salonSlug]/ai-studio/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
-  Clock,
-  MapPin,
-  Phone,
-  Sun,
-  Droplets,
-  Star,
-  ShieldCheck,
+  Camera,
   Sparkles,
-  Scissors,
+  ArrowLeft,
+  RefreshCw,
   ChevronRight,
-  Wallet,
+  CheckCircle2,
+  Check,
 } from 'lucide-react';
-import { Tenant, Service, Staff } from '@/types/database';
-import { getTenantBySlug, getTenantServices, getTenantStaff } from '@/lib/supabase';
+import { VisualRecommendation } from '@/app/api/ai/visual-tryon/route';
 
-export default function SalonStorefrontPage() {
+type StudioMode = 'nails' | 'hair' | 'lashes';
+
+function AIStudioContent() {
   const params = useParams();
+  const router = useRouter();
   const slug = (params?.salonSlug as string) || 'legends-barbershop-avondale';
 
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<StudioMode>('nails');
+  const [cameraActive, setCameraActive] = useState<boolean>(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [recommendations, setRecommendations] = useState<VisualRecommendation[]>([]);
+  const [selectedLook, setSelectedLook] = useState<VisualRecommendation | null>(null);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Initialize camera feed
   useEffect(() => {
-    async function loadSalonData() {
-      setLoading(true);
+    let stream: MediaStream | null = null;
+
+    async function initCamera() {
       try {
-        const tenantData = await getTenantBySlug(slug);
-        if (tenantData) {
-          setTenant(tenantData);
-          const [servicesData, staffData] = await Promise.all([
-            getTenantServices(tenantData.id),
-            getTenantStaff(tenantData.id),
-          ]);
-          setServices(servicesData);
-          setStaff(staffData);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+        });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          setCameraActive(true);
         }
       } catch (err) {
-        console.error('Failed to load salon:', err);
-      } finally {
-        setLoading(false);
+        console.warn('Camera access unavailable:', err);
+        setCameraActive(false);
       }
     }
-    loadSalonData();
-  }, [slug]);
 
-  if (loading || !tenant) {
-    return (
-      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-neutral-400 text-sm tracking-wide">Loading salon chair experience...</p>
-        </div>
-      </div>
-    );
-  }
+    if (!capturedPhoto) {
+      initCamera();
+    }
 
-  const categories = ['All', ...Array.from(new Set(services.map((s) => s.category)))];
-  const filteredServices =
-    selectedCategory === 'All'
-      ? services
-      : services.filter((s) => s.category === selectedCategory);
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [capturedPhoto]);
+
+  // Capture frame from video onto an invisible canvas
+  const handleCaptureAndGenerate = async () => {
+    if (!videoRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Flip horizontal so it matches mirror perspective
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const base64Image = canvas.toDataURL('image/jpeg', 0.85);
+    setCapturedPhoto(base64Image);
+    setIsAnalyzing(true);
+
+    try {
+      const res = await fetch('/api/ai/visual-tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Image,
+          mode,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.recommendations && data.recommendations.length > 0) {
+        setRecommendations(data.recommendations);
+        setSelectedLook(data.recommendations[0]);
+      }
+    } catch (err) {
+      console.error('AI try-on error:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleRetake = () => {
+    setCapturedPhoto(null);
+    setRecommendations([]);
+    setSelectedLook(null);
+  };
+
+  const handleBookChosenLook = () => {
+    if (!selectedLook) return;
+    const query = `?tryon=${selectedLook.category}&style=${encodeURIComponent(
+      selectedLook.title
+    )}&shade=${encodeURIComponent(selectedLook.shade)}`;
+    router.push(`/${slug}/book${query}`);
+  };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans selection:bg-amber-500 selection:text-black">
-      {/* Top Banner / Utility Badges (African Market Optimization) */}
-      <div className="bg-neutral-900 border-b border-neutral-800 text-xs px-4 py-2.5">
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            {tenant.has_solar_backup && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                <Sun className="w-3.5 h-3.5 text-emerald-400" />
-                100% Solar Backup (No Load-Shedding)
-              </span>
-            )}
-            {tenant.has_borehole_water && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
-                <Droplets className="w-3.5 h-3.5 text-cyan-400" />
-                Borehole Water Running
-              </span>
-            )}
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col justify-between selection:bg-amber-500 selection:text-black">
+      {/* Header */}
+      <header className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-40 px-4 py-3.5">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <Link
+            href={`/${slug}`}
+            className="flex items-center gap-2 text-xs font-semibold text-neutral-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Salon
+          </Link>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span className="font-extrabold text-white text-sm">TrimFlow AI Visual Studio</span>
           </div>
-          <div className="flex items-center gap-4 text-neutral-400">
-            <span className="flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5 text-amber-400" />
-              {tenant.phone}
-            </span>
-            <Link
-              href="/admin/dashboard"
-              className="text-neutral-400 hover:text-amber-400 transition-colors underline underline-offset-4"
+          {capturedPhoto && (
+            <button
+              onClick={handleRetake}
+              className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-200 font-semibold flex items-center gap-1.5 transition-all border border-neutral-700"
             >
-              Barber / Staff Login →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Hero Section */}
-      <header className="relative overflow-hidden border-b border-neutral-800 bg-gradient-to-b from-neutral-900 to-neutral-950 py-12 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 text-xs font-semibold uppercase tracking-wider rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                  Premium Grooming Lounge
-                </span>
-                <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  4.9 (184 client reviews)
-                </span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white">
-                {tenant.name}
-              </h1>
-              <p className="mt-2 text-neutral-400 flex items-center gap-1.5 text-sm sm:text-base">
-                <MapPin className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                {tenant.address}
-              </p>
-            </div>
-
-            {/* Direct Booking CTA */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Link
-                href={`/${tenant.slug}/ai-studio`}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-400 font-bold text-sm border border-amber-500/40 shadow-lg shadow-black/40 transition-all hover:scale-[1.02]"
-              >
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                AI Virtual Try-On (Nails & Hair)
-              </Link>
-              <Link
-                href={`/${tenant.slug}/book`}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-base shadow-lg shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Scissors className="w-5 h-5" />
-                Book Your Chair (30s)
-              </Link>
-            </div>
-          </div>
-
-          {/* Value Prop Badges */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 pt-6 border-t border-neutral-800/60">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <Clock className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-neutral-400">Zero Wait Time</p>
-                <p className="text-sm font-semibold text-neutral-200">Guaranteed Reserved Chair</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <Wallet className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-neutral-400">No Small Change Stress</p>
-                <p className="text-sm font-semibold text-neutral-200">Digital Change Wallet Ready</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <ShieldCheck className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-neutral-400">Multi-Payment Methods</p>
-                <p className="text-sm font-semibold text-neutral-200">USD Cash, EcoCash, InnBucks</p>
-              </div>
-            </div>
-          </div>
+              <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+              Retake Photo
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none mb-8">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold tracking-wide transition-all whitespace-nowrap ${
-                selectedCategory === cat
-                  ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
-                  : 'bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+      {/* Main Studio Viewport */}
+      <main className="max-w-5xl mx-auto w-full px-4 py-6 space-y-6 flex-1">
+        {/* Department Mode Selector Pills */}
+        <div className="flex items-center justify-center gap-2 p-1.5 rounded-2xl bg-neutral-900 border border-neutral-800 max-w-md mx-auto">
+          <button
+            onClick={() => {
+              setMode('nails');
+              handleRetake();
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'nails'
+                ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            💅 Virtual Nails (Hand)
+          </button>
+
+          <button
+            onClick={() => {
+              setMode('hair');
+              handleRetake();
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'hair'
+                ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            ✂️ Hair & Beard (Face)
+          </button>
+
+          <button
+            onClick={() => {
+              setMode('lashes');
+              handleRetake();
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              mode === 'lashes'
+                ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            👁️ Lashes & Brows
+          </button>
         </div>
 
-        {/* Services Menu Grid */}
-        <section className="mb-14">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              Service Menu & Pricing
-            </h2>
-            <span className="text-xs text-neutral-400">
-              {filteredServices.length} options available
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredServices.map((service) => (
-              <div
-                key={service.id}
-                className="group relative p-5 rounded-2xl bg-neutral-900/80 border border-neutral-800 hover:border-amber-500/50 transition-all hover:shadow-xl hover:shadow-black/50 flex flex-col justify-between"
-              >
-                {service.is_featured && (
-                  <span className="absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    VIP Choice
-                  </span>
-                )}
-                <div>
-                  <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
-                    {service.category}
-                  </span>
-                  <h3 className="text-lg font-bold text-white group-hover:text-amber-400 transition-colors mt-0.5">
-                    {service.name}
-                  </h3>
-                  {service.description && (
-                    <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed">
-                      {service.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-neutral-800/80 flex items-center justify-between">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xl font-extrabold text-white">
-                      ${service.price_usd.toFixed(2)}
-                    </span>
-                    {service.price_zwg && (
-                      <span className="text-xs text-neutral-400">
-                        / ZiG {service.price_zwg.toFixed(0)}
-                      </span>
-                    )}
-                    <span className="text-xs text-neutral-500 flex items-center gap-1 ml-1">
-                      <Clock className="w-3 h-3" />
-                      {service.duration_minutes}m
-                    </span>
-                  </div>
-
-                  <Link
-                    href={`/${tenant.slug}/book?serviceId=${service.id}`}
-                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-amber-500 hover:text-neutral-950 text-xs font-semibold text-neutral-200 transition-all"
-                  >
-                    Select
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Master Stylists / Chairs */}
-        <section className="mb-14">
-          <div className="mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <Scissors className="w-5 h-5 text-amber-400" />
-              Resident Master Barbers
-            </h2>
-            <p className="text-xs text-neutral-400 mt-1">
-              Choose your favorite barber or select &apos;First Available&apos; during booking.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {staff.map((barber) => (
-              <div
-                key={barber.id}
-                className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col items-center text-center"
-              >
-                <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-amber-500/40 mb-3 shadow-md">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={
-                      barber.avatar_url ||
-                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200'
-                    }
-                    alt={barber.full_name}
-                    className="w-full h-full object-cover"
-                  />
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-neutral-900 rounded-full"></span>
-                </div>
-                <h3 className="font-bold text-white text-base">{barber.full_name}</h3>
-                <span className="text-xs text-amber-400 font-medium capitalize mt-0.5">
-                  Senior Chair Master
-                </span>
-
-                {barber.specialties && barber.specialties.length > 0 && (
-                  <div className="flex flex-wrap gap-1 justify-center mt-3">
-                    {barber.specialties.map((spec) => (
-                      <span
-                        key={spec}
-                        className="px-2 py-0.5 rounded text-[10px] bg-neutral-800 text-neutral-300 border border-neutral-700"
-                      >
-                        {spec}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <Link
-                  href={`/${tenant.slug}/book?barberId=${barber.id}`}
-                  className="mt-4 w-full py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 transition-colors"
-                >
-                  Book with {barber.full_name.split(' ')[0]}
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Digital Change Wallet Feature Callout (Monetization & Retention Moat) */}
-        <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-amber-500/10 via-neutral-900 to-neutral-900 border border-amber-500/30">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="max-w-xl">
-              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 inline-block mb-3">
-                Local Cashflow Innovation
-              </span>
-              <h3 className="text-xl sm:text-2xl font-extrabold text-white">
-                Never worry about $1, $2, or $5 change again
-              </h3>
-              <p className="mt-2 text-sm text-neutral-300 leading-relaxed">
-                When paying in USD cash at our shop, any remaining change can instantly be credited
-                to your personal Digital Change Wallet attached to your WhatsApp phone number.
-                Redeem it automatically on your next haircut!
+        {/* Viewport: Live Camera OR Captured Photo with Fitting */}
+        <div className="relative aspect-[4/3] sm:aspect-[16/10] w-full max-w-2xl mx-auto rounded-3xl overflow-hidden bg-neutral-900 border-2 border-neutral-800 shadow-2xl flex items-center justify-center">
+          {capturedPhoto ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={capturedPhoto} alt="Captured Look" className="w-full h-full object-cover" />
+          ) : cameraActive ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover -scale-x-100"
+            />
+          ) : (
+            <div className="text-center p-6 space-y-3">
+              <Camera className="w-12 h-12 text-neutral-600 mx-auto animate-pulse" />
+              <p className="text-xs text-neutral-400 max-w-xs mx-auto">
+                {mode === 'nails'
+                  ? 'Hold your fingers up to your camera to take a photo and test artificial nails.'
+                  : mode === 'hair'
+                  ? 'Center your face in the camera frame to scan your face shape and hairline.'
+                  : 'Look forward into the camera to scan eyelid-to-brow spacing.'}
               </p>
             </div>
-            <Link
-              href={`/${tenant.slug}/book`}
-              className="inline-flex items-center justify-center px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-sm whitespace-nowrap transition-transform active:scale-95"
-            >
-              Reserve Chair Now →
-            </Link>
-          </div>
-        </section>
-      </main>
+          )}
 
-      {/* Footer */}
-      <footer className="border-t border-neutral-900 py-8 px-4 text-center text-xs text-neutral-500">
-        <p>© 2026 {tenant.name}. Powered by TrimFlow AI Enterprise SaaS.</p>
-        <div className="flex justify-center gap-4 mt-2">
-          <Link href="/admin/dashboard" className="hover:text-neutral-400 underline">
-            Salon Admin Cockpit
-          </Link>
-          <Link href="/admin/pos" className="hover:text-neutral-400 underline">
-            POS & Change Wallet
-          </Link>
+          {/* AI Scanning Beam Overlay */}
+          {isAnalyzing && (
+            <div className="absolute inset-0 bg-neutral-950/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-amber-400 text-xs font-bold uppercase tracking-wider animate-pulse">
+                AI Analyzing Undertones & Fitting 4 Styles...
+              </p>
+            </div>
+          )}
+
+          {/* Real-time Fitting Overlay onto the Photo */}
+          {selectedLook && !isAnalyzing && (
+            <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
+              <div className="self-end px-3 py-1.5 rounded-full bg-neutral-950/90 backdrop-blur text-xs font-bold text-amber-400 border border-amber-500/40 flex items-center gap-1.5 shadow-lg">
+                <Sparkles className="w-3.5 h-3.5" />
+                {selectedLook.title} ({selectedLook.undertoneMatchScore}% Match)
+              </div>
+
+              {/* Virtual Nail Caps composited over fingers */}
+              {mode === 'nails' && (
+                <div className="flex justify-center items-end gap-5 pb-8">
+                  {[1, 2, 3, 4].map((finger) => (
+                    <div key={finger} className="flex flex-col items-center gap-1">
+                      <div
+                        style={{
+                          backgroundColor: selectedLook.colorHex,
+                          borderRadius: selectedLook.shape.includes('Almond')
+                            ? '50% 50% 15% 15%'
+                            : selectedLook.shape.includes('Coffin')
+                            ? '15% 15% 5% 5%'
+                            : selectedLook.shape.includes('Stiletto')
+                            ? '60% 60% 10% 10%'
+                            : '6px 6px 0 0',
+                          height: '46px',
+                          width: finger === 1 ? '16px' : finger === 4 ? '13px' : '18px',
+                        }}
+                        className="shadow-2xl border border-black/40"
+                      />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Snap Photo Shutter Button (Visible when camera is active and no photo taken yet) */}
+          {!capturedPhoto && cameraActive && (
+            <div className="absolute bottom-6 inset-x-0 flex justify-center">
+              <button
+                onClick={handleCaptureAndGenerate}
+                className="px-6 py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black text-sm shadow-2xl shadow-amber-500/40 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Snap & Generate AI Looks</span>
+              </button>
+            </div>
+          )}
         </div>
-      </footer>
+
+        {/* 4 GENERATED OUTCOME CARDS (The User Picks the Best One) */}
+        {recommendations.length > 0 && (
+          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                  Pick The Outcome That Fits You Most
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Tap any card below to see it fitted onto your photo above.
+                </p>
+              </div>
+              <span className="text-xs font-mono text-emerald-400">4 Styles Generated</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {recommendations.map((rec) => {
+                const isSelected = selectedLook?.id === rec.id;
+                return (
+                  <div
+                    key={rec.id}
+                    onClick={() => setSelectedLook(rec)}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500'
+                        : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-amber-400">
+                          {rec.shape}
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          {rec.undertoneMatchScore}% Match
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-4 h-4 rounded-full border border-neutral-700 flex-shrink-0"
+                          style={{ backgroundColor: rec.colorHex }}
+                        />
+                        <h4 className="text-xs font-bold text-white leading-tight">{rec.title}</h4>
+                      </div>
+
+                      <p className="text-[11px] text-neutral-400 leading-relaxed">
+                        {rec.stylistNote}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-neutral-800/80 flex items-center justify-between">
+                      <span className="text-[10px] text-neutral-500">{rec.shade}</span>
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                          isSelected ? 'bg-amber-500 text-neutral-950' : 'bg-neutral-800 text-neutral-600'
+                        }`}
+                      >
+                        <Check className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Booking Confirmation CTA */}
+            {selectedLook && (
+              <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                    Selected Look Ready
+                  </span>
+                  <h4 className="text-sm font-bold text-white">{selectedLook.title}</h4>
+                  <p className="text-xs text-neutral-400">
+                    This photo and formula will be attached to your appointment ticket for your stylist.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleBookChosenLook}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 whitespace-nowrap transition-transform active:scale-95"
+                >
+                  <span>Book with This Selected Look</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
     </div>
+  );
+}
+
+export default function AIBeautyStudioPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <AIStudioContent />
+    </Suspense>
   );
 }
